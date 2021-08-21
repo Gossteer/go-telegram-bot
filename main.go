@@ -53,8 +53,8 @@ func main() {
 		botSendS := botSendStruct{bot, update.Message.Chat.ID, "Я бот Антон"}
 
 		if len_commands > 0 {
-			switch strings.ToUpper(commands[0]) {
-			case "ADD":
+			switch strings.ToLower(commands[0]) {
+			case "add":
 				if !chekLenCommand(len_commands, 3) {
 					botSend(setMessageScruct(&botSendS, "Неверные аргументы"))
 
@@ -66,7 +66,7 @@ func main() {
 
 					continue
 				}
-			case "SUB":
+			case "sub":
 				if !chekLenCommand(len_commands, 3) {
 					botSend(setMessageScruct(&botSendS, "Неверные аргументы"))
 
@@ -78,7 +78,7 @@ func main() {
 
 					continue
 				}
-			case "DEL":
+			case "del":
 				if !chekLenCommand(len_commands, 2) {
 					botSend(setMessageScruct(&botSendS, "Неверные аргументы"))
 
@@ -86,20 +86,22 @@ func main() {
 				}
 
 				delete(db[user_id], commands[1])
-			case "SHOW":
+			case "show":
 				if err := sendShowPrice(botSendS, []string{"RUB", "USDT"}, user_id); err != nil {
 					botSend(setMessageScruct(&botSendS, err.Error()))
 				}
-			case "SHOWRUB":
+			case "showrub":
 				if err := sendShowPrice(botSendS, []string{"RUB"}, user_id); err != nil {
 					botSend(setMessageScruct(&botSendS, err.Error()))
 				}
-			case "SHOWUSDT":
+			case "showusdt":
 				if err := sendShowPrice(botSendS, []string{"USDT"}, user_id); err != nil {
 					botSend(setMessageScruct(&botSendS, err.Error()))
 				}
 			case "/help":
-				botSend(setMessageScruct(&botSendS, "Я не работаю, памагите")) //fix
+				botSend(setMessageScruct(&botSendS, "Список команд (вводи без скобок, можно в нижнем регистре):\nДля добавления валюты - ADD [название валюты] [сумма (можно десятичное используй точку '.')]\nДля снятия валюты - SUB [название валюты] [сумма (можно десятичное используй точку '.')]\nДля удаления валюты - DEL [название валюты]\nДля демонстрации всех валют в кошельке - SHOW(RUB/USDT)\nПримеры команд: \nADD BTC 0.15\nADD ETH 3.1225\nADD XRP 12.1\nSUB BTC 0.09\nDEL BTC\nSHOW"))
+			case "/start":
+				botSend(setMessageScruct(&botSendS, "Привет, я тестовый бот по криптовалютному кошельку. Все подробности можно узнать через /help")) //fix
 			default:
 				botSend(setMessageScruct(&botSendS, "Я тебя не понял, повторись: "+commands[0]))
 			}
@@ -107,6 +109,7 @@ func main() {
 			botSend(setMessageScruct(&botSendS, "Неверные аргументы"))
 		}
 
+		// botSend(setMessageScruct(&botSendS, update.CallbackQuery.Data))
 		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 	}
 }
@@ -158,7 +161,9 @@ func setMessageScruct(botSendS *botSendStruct, message string) botSendStruct {
 }
 
 func botSend(botSendS botSendStruct) (tgbotapi.Message, error) {
-	return botSendS.bot.Send(tgbotapi.NewMessage(botSendS.chat_id, botSendS.message))
+	lol := tgbotapi.NewMessage(botSendS.chat_id, botSendS.message)
+
+	return botSendS.bot.Send(lol)
 }
 
 func chekLenCommand(command int, need_len int) bool {
