@@ -27,6 +27,12 @@ type wallet map[string]float64
 
 var db = map[int]wallet{}
 
+var numericKeyboard = tgbotapi.NewReplyKeyboard(
+	tgbotapi.NewKeyboardButtonRow(
+		tgbotapi.NewKeyboardButton("SHOW"),
+	),
+)
+
 func main() {
 	bot, err := tgbotapi.NewBotAPI(getToken())
 	if err != nil {
@@ -46,11 +52,25 @@ func main() {
 		if update.Message == nil {
 			continue
 		}
+		botSendS := botSendStruct{bot, update.Message.Chat.ID, "Я бот Антон"}
+
+		command := update.Message.Command()
+		if command != "" {
+			switch strings.ToLower(command) {
+			case "help":
+				botSend(setMessageScruct(&botSendS, "Список команд (вводи без скобок, можно в нижнем регистре):\nДля добавления валюты - ADD [название валюты] [сумма (можно десятичное используй точку '.')]\nДля снятия валюты - SUB [название валюты] [сумма (можно десятичное используй точку '.')]\nДля удаления валюты - DEL [название валюты]\nДля демонстрации всех валют в кошельке - SHOW(RUB/USDT)\nПримеры команд: \nADD BTC 0.15\nADD ETH 3.1225\nADD XRP 12.1\nSUB BTC 0.09\nDEL BTC\nSHOW"))
+
+				continue
+			case "start":
+				botSend(setMessageScruct(&botSendS, "Привет, я тестовый бот по криптовалютному кошельку. Все подробности можно узнать через /help"))
+
+				continue
+			}
+		}
 
 		commands := strings.Split(update.Message.Text, " ")
 		len_commands := len(commands)
 		user_id := update.Message.From.ID
-		botSendS := botSendStruct{bot, update.Message.Chat.ID, "Я бот Антон"}
 
 		if len_commands > 0 {
 			switch strings.ToLower(commands[0]) {
@@ -98,10 +118,6 @@ func main() {
 				if err := sendShowPrice(botSendS, []string{"USDT"}, user_id); err != nil {
 					botSend(setMessageScruct(&botSendS, err.Error()))
 				}
-			case "/help":
-				botSend(setMessageScruct(&botSendS, "Список команд (вводи без скобок, можно в нижнем регистре):\nДля добавления валюты - ADD [название валюты] [сумма (можно десятичное используй точку '.')]\nДля снятия валюты - SUB [название валюты] [сумма (можно десятичное используй точку '.')]\nДля удаления валюты - DEL [название валюты]\nДля демонстрации всех валют в кошельке - SHOW(RUB/USDT)\nПримеры команд: \nADD BTC 0.15\nADD ETH 3.1225\nADD XRP 12.1\nSUB BTC 0.09\nDEL BTC\nSHOW"))
-			case "/start":
-				botSend(setMessageScruct(&botSendS, "Привет, я тестовый бот по криптовалютному кошельку. Все подробности можно узнать через /help")) //fix
 			default:
 				botSend(setMessageScruct(&botSendS, "Я тебя не понял, повторись: "+commands[0]))
 			}
@@ -110,7 +126,7 @@ func main() {
 		}
 
 		// botSend(setMessageScruct(&botSendS, update.CallbackQuery.Data))
-		log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
+		// log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 	}
 }
 
@@ -144,6 +160,8 @@ func sendShowPrice(botSendS botSendStruct, symbols_to []string, user_id int) err
 
 			resp += fmt.Sprintf("%s (%s): %.2f\n", key, symbol_to, value*rub_price)
 		}
+
+		resp += "\n"
 	}
 	botSend(setMessageScruct(&botSendS, resp))
 
@@ -161,9 +179,10 @@ func setMessageScruct(botSendS *botSendStruct, message string) botSendStruct {
 }
 
 func botSend(botSendS botSendStruct) (tgbotapi.Message, error) {
-	lol := tgbotapi.NewMessage(botSendS.chat_id, botSendS.message)
+	msg := tgbotapi.NewMessage(botSendS.chat_id, botSendS.message)
+	msg.ReplyMarkup = numericKeyboard
 
-	return botSendS.bot.Send(lol)
+	return botSendS.bot.Send(msg)
 }
 
 func chekLenCommand(command int, need_len int) bool {
