@@ -33,6 +33,57 @@ var numericKeyboard = tgbotapi.NewReplyKeyboard(
 	),
 )
 
+var commands_map = map[string]func(botSendS *botSendStruct) (tgbotapi.Message, error){
+	"help": func(botSendS *botSendStruct) (tgbotapi.Message, error) {
+		return botSend(setMessageScruct(botSendS, "Список команд (вводи без скобок, можно в нижнем регистре):\nДля добавления валюты - ADD [название валюты] [сумма (можно десятичное используй точку '.')]\nДля снятия валюты - SUB [название валюты] [сумма (можно десятичное используй точку '.')]\nДля удаления валюты - DEL [название валюты]\nДля демонстрации всех валют в кошельке - SHOW(RUB/USDT)\nПримеры команд: \nADD BTC 0.15\nADD ETH 3.1225\nADD XRP 12.1\nSUB BTC 0.09\nDEL BTC\nSHOW"))
+	},
+	"start": func(botSendS *botSendStruct) (tgbotapi.Message, error) {
+		return botSend(setMessageScruct(botSendS, "Привет, я тестовый бот по криптовалютному кошельку. Все подробности можно узнать через /help"))
+	},
+}
+
+type CustomCommansMapS struct {
+	function     func(botSendS *botSendStruct, commands []string, user_id int) error
+	need_command int
+}
+
+var custom_commands_map = map[string]CustomCommansMapS{
+	"add": {func(botSendS *botSendStruct, commands []string, user_id int) error {
+		money, err := strconv.ParseFloat(commands[2], 64)
+		if err != nil {
+			return err
+		}
+
+		err_set_price := setPrice(user_id, money, commands[1])
+		if err_set_price != nil {
+			return errors.New("операция невыполнена")
+		}
+
+		return nil
+	}, 3},
+	"sub": {func(botSendS *botSendStruct, commands []string, user_id int) error {
+		money, err := strconv.ParseFloat(commands[2], 64)
+		if err != nil {
+			return err
+		}
+
+		err_set_price := setPrice(user_id, -1*money, commands[1])
+		if err_set_price != nil {
+			return errors.New("операция невыполнена")
+		}
+
+		return nil
+	}, 3},
+	"del": {func(botSendS *botSendStruct, commands []string, user_id int) error {
+		delete(db[user_id], commands[1])
+
+		return nil
+	}, 2},
+	"show": {func(botSendS *botSendStruct, commands []string, user_id int) error {
+		return sendShowPrice(botSendS, []string{"RUB", "USDT"}, user_id)
+	}, 0},
+}
+
 func main() {
 	bot, err := tgbotapi.NewBotAPI(getToken())
 	if err != nil {
@@ -49,103 +100,48 @@ func main() {
 	updates, _ := bot.GetUpdatesChan(u)
 
 	for update := range updates {
-		if update.Message == nil {
+		if update.Message == nil || update.Message.Text == "" {
 			continue
 		}
 		botSendS := botSendStruct{bot, update.Message.Chat.ID, "Я бот Антон"}
 
-		command := update.Message.Command()
-		if command != "" {
-			switch strings.ToLower(command) {
-			case "help":
-				botSend(setMessageScruct(&botSendS, "Список команд (вводи без скобок, можно в нижнем регистре):\nДля добавления валюты - ADD [название валюты] [сумма (можно десятичное используй точку '.')]\nДля снятия валюты - SUB [название валюты] [сумма (можно десятичное используй точку '.')]\nДля удаления валюты - DEL [название валюты]\nДля демонстрации всех валют в кошельке - SHOW(RUB/USDT)\nПримеры команд: \nADD BTC 0.15\nADD ETH 3.1225\nADD XRP 12.1\nSUB BTC 0.09\nDEL BTC\nSHOW"))
+		if command, ok := commands_map[strings.ToLower(update.Message.Command())]; ok {
+			_, err := command(&botSendS)
 
-				continue
-			case "start":
-				botSend(setMessageScruct(&botSendS, "Привет, я тестовый бот по криптовалютному кошельку. Все подробности можно узнать через /help"))
-
-				continue
+			if err != nil {
+				botSend(setMessageScruct(&botSendS, err.Error()))
 			}
+
+			continue
 		}
 
 		commands := strings.Split(update.Message.Text, " ")
-		len_commands := len(commands)
 		user_id := update.Message.From.ID
 
-		if len_commands > 0 {
-			switch strings.ToLower(commands[0]) {
-			case "add":
-				if !chekLenCommand(len_commands, 3) {
-					botSend(setMessageScruct(&botSendS, "Неверные аргументы"))
+		if custom_command, ok := custom_commands_map[strings.ToLower(commands[0])]; ok && chekLenCommand(commands, custom_command.need_command) {
+			err := custom_command.function(&botSendS, commands, user_id)
 
-					continue
-				}
-
-				if err := setPrice(user_id, commands); err != nil {
-					botSend(setMessageScruct(&botSendS, err.Error()))
-
-					continue
-				}
-			case "sub":
-				if !chekLenCommand(len_commands, 3) {
-					botSend(setMessageScruct(&botSendS, "Неверные аргументы"))
-
-					continue
-				}
-
-				if err := setPrice(user_id, commands); err != nil {
-					botSend(setMessageScruct(&botSendS, err.Error()))
-
-					continue
-				}
-			case "del":
-				if !chekLenCommand(len_commands, 2) {
-					botSend(setMessageScruct(&botSendS, "Неверные аргументы"))
-
-					continue
-				}
-
-				delete(db[user_id], commands[1])
-			case "show":
-				if err := sendShowPrice(botSendS, []string{"RUB", "USDT"}, user_id); err != nil {
-					botSend(setMessageScruct(&botSendS, err.Error()))
-				}
-			case "showrub":
-				if err := sendShowPrice(botSendS, []string{"RUB"}, user_id); err != nil {
-					botSend(setMessageScruct(&botSendS, err.Error()))
-				}
-			case "showusdt":
-				if err := sendShowPrice(botSendS, []string{"USDT"}, user_id); err != nil {
-					botSend(setMessageScruct(&botSendS, err.Error()))
-				}
-			default:
-				botSend(setMessageScruct(&botSendS, "Я тебя не понял, повторись: "+commands[0]))
+			if err != nil {
+				botSend(setMessageScruct(&botSendS, err.Error()))
 			}
 		} else {
-			botSend(setMessageScruct(&botSendS, "Неверные аргументы"))
+			botSend(setMessageScruct(&botSendS, "Ошибка"))
 		}
 
-		// botSend(setMessageScruct(&botSendS, update.CallbackQuery.Data))
-		// log.Printf("[%s] %s", update.Message.From.UserName, update.Message.Text)
 	}
 }
 
-func setPrice(user_id int, commands []string) error {
-	money, err := strconv.ParseFloat(commands[2], 64)
-	if err != nil {
-		return errors.New("ошибка преобразования цена")
-	}
-
+func setPrice(user_id int, money float64, key string) error {
 	if _, ok := db[user_id]; !ok {
 		db[user_id] = make(wallet)
 	}
 
-	db[user_id][commands[1]] += money
+	db[user_id][key] += money
 
 	return nil
 }
 
-func sendShowPrice(botSendS botSendStruct, symbols_to []string, user_id int) error {
+func sendShowPrice(botSendS *botSendStruct, symbols_to []string, user_id int) error {
 	resp := ""
 	for key, value := range db[user_id] {
 
@@ -153,8 +149,6 @@ func sendShowPrice(botSendS botSendStruct, symbols_to []string, user_id int) err
 			rub_price, err := getPrice(key, symbol_to)
 
 			if err != nil {
-				botSend(setMessageScruct(&botSendS, err.Error()))
-
 				return err
 			}
 
@@ -163,7 +157,7 @@ func sendShowPrice(botSendS botSendStruct, symbols_to []string, user_id int) err
 
 		resp += "\n"
 	}
-	botSend(setMessageScruct(&botSendS, resp))
+	botSend(setMessageScruct(botSendS, resp))
 
 	return nil
 }
@@ -185,8 +179,8 @@ func botSend(botSendS botSendStruct) (tgbotapi.Message, error) {
 	return botSendS.bot.Send(msg)
 }
 
-func chekLenCommand(command int, need_len int) bool {
-	return (command == need_len)
+func chekLenCommand(command []string, need_len int) bool {
+	return (len(command) >= need_len)
 }
 
 func getPrice(symbol_in string, symbol_to string) (float64, error) {
