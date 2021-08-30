@@ -57,9 +57,8 @@ var custom_commands_map = map[string]CustomCommansMapS{
 			return err
 		}
 
-		err_set_price := setPrice(user_id, money, commands[1])
-		if err_set_price != nil {
-			return errors.New("операция невыполнена")
+		if err_set_price := setPrice(user_id, money, commands[1]); err_set_price != nil {
+			return errors.New(err_set_price.Error())
 		}
 
 		return nil
@@ -69,10 +68,10 @@ var custom_commands_map = map[string]CustomCommansMapS{
 		if err != nil {
 			return err
 		}
+		money = -money
 
-		err_set_price := setPrice(user_id, -1*money, commands[1])
-		if err_set_price != nil {
-			return errors.New("операция невыполнена")
+		if err_set_price := setPrice(user_id, -money, commands[1]); err_set_price != nil {
+			return errors.New(err_set_price.Error())
 		}
 
 		return nil
@@ -148,6 +147,10 @@ func main() {
 func setPrice(user_id int, money float64, key string) error {
 	if _, ok := db[user_id]; !ok {
 		db[user_id] = make(wallet)
+	}
+
+	if (db[user_id][key] + money) < 0.0 {
+		return errors.New("недостаточно средств")
 	}
 
 	db[user_id][key] += money
