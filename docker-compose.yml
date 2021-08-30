@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  telegram_bot_golang:
+    container_name: ${APP_NAME}
+    build:
+      context: . # Use an image built from the specified dockerfile in the current directory.
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    security_opt:
+      - no-new-privileges:true
+    labels:
+      # Frontend
+      - "traefik.enable=false"
+
+
+networks:
+  default:
+    external: 
+      name: traefik

@@ -6,8 +6,11 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
+
+	"github.com/joho/godotenv"
 
 	tgbotapi "github.com/go-telegram-bot-api/telegram-bot-api"
 )
@@ -84,8 +87,19 @@ var custom_commands_map = map[string]CustomCommansMapS{
 	}, 0},
 }
 
+func init() {
+	if err := godotenv.Load(); err != nil {
+		log.Panic("No .env file found")
+	}
+}
+
 func main() {
-	bot, err := tgbotapi.NewBotAPI(getToken())
+	token, err := getToken()
+	if err != nil {
+		log.Panic(err)
+	}
+
+	bot, err := tgbotapi.NewBotAPI(token)
 	if err != nil {
 		log.Panic(err)
 	}
@@ -142,7 +156,7 @@ func setPrice(user_id int, money float64, key string) error {
 }
 
 func sendShowPrice(botSendS *botSendStruct, symbols_to []string, user_id int) error {
-	resp := ""
+	resp := "На счету: \n"
 	for key, value := range db[user_id] {
 
 		for _, symbol_to := range symbols_to {
@@ -162,8 +176,14 @@ func sendShowPrice(botSendS *botSendStruct, symbols_to []string, user_id int) er
 	return nil
 }
 
-func getToken() string {
-	return ""
+func getToken() (string, error) {
+	token, exists := os.LookupEnv("token")
+
+	if !exists {
+		return "", errors.New("токен не обнаружен")
+	}
+
+	return token, nil
 }
 
 func setMessageScruct(botSendS *botSendStruct, message string) botSendStruct {
